@@ -16,7 +16,7 @@ T1 · S1,S4 · inline · done · Estructura, cambios, rama y remoto revisados; b
 T2 · S2,S3 · inline · done · `Readme.md` en español de España y guía reproducible en `eb0c03e`.
 T3 · S3 · delegated `gentle-ai-verify` · done · Config, build, salud, BIND/DHCP, TSIG, DHCP, DDNS, réplica y persistencia verificados; comportamiento en `1f847db`, documentación en `eb0c03e`.
 T4 · S1-S5 · inline · done · Commit raíz `f9c1427`, laboratorio `1f847db` y documentación `eb0c03e`; rama limpia y commits convencionales.
-T5 · S4,S5 · inline · in_progress · Crear soporte remoto aprobado, subir `main` y `feat/create-repository-files`, y abrir la PR con evidencia.
+T5 · S4,S5 · inline · done · `main` y `feat/create-repository-files` publicadas; issue aprobada #1 y PR #2 abiertas; etiqueta única `type:docs`; GitGuardian correcto.
 
 ## Log
 
@@ -30,3 +30,4 @@ L7. Decisión del usuario: «Crear base y flujo completo (recomendado)» — cre
 L8. Verificación funcional aislada: construcción, salud, validadores, DHCP (`10.53.0.120/121`), DDNS A/PTR/DHCID, IXFR al secundario y persistencia superaron las pruebas. Se detectaron cuatro discrepancias documentales: `ps` debía usar `-a`, el grupo visible de la clave en DHCP es `dhcpd`, faltaba declarar BuildKit/Buildx y las zonas semilla no terminaban en salto de línea. Las cuatro se corrigieron.
 L9. Cierre de T3: el spot check confirmó salud, carga de zonas sin avisos, sintaxis DHCP y permisos TSIG; tras corregir espacios finales en `compose.yml`, `git diff --check` y `docker compose config -q` finalizaron con código 0. Un verificador independiente confirmó S3 y la viabilidad del plan de entrega. `gentle_review assess` clasificó el cambio como alto por escalado explícito del riesgo 5 (entrega/entorno) y exigió el verificador independiente ya completado.
 L10. Work units: `f9c1427` crea la base vacía compartida con `main`; `1f847db` añade el laboratorio DNS/DHCP; `eb0c03e` añade la guía reproducible. La única PR cubre `main..feat/create-repository-files`, 783 líneas añadidas; se aplica la estrategia aprobada `single-pr` para el repositorio inicial.
+L11. Entrega remota confirmada: etiquetas `type:docs` y `status:approved` creadas; issue aprobada https://github.com/mrodara/ap2-dns-secondary-rndckey-guided/issues/1; `main` establecida como rama predeterminada; rama feature publicada; PR https://github.com/mrodara/ap2-dns-secondary-rndckey-guided/pull/2 abierta contra `main`, cierra #1, tiene exactamente una etiqueta `type:*` y GitGuardian pasó.
