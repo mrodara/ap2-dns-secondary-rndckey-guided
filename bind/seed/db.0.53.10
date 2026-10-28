@@ -1,0 +1,10 @@
+$TTL 60
+; SOA de la zona inversa, con el mismo serial inicial.
+@ IN SOA ns1.aulasri.test. hostmaster.aulasri.test. ( 2026102801 60 30 604800 60 )
+; Ambos DNS son autoritativos también para la zona inversa.
+@ IN NS ns1.aulasri.test.
+@ IN NS ns2.aulasri.test.
+; PTR de los servicios fijos.
+2   IN PTR dhcp.aulasri.test.
+100 IN PTR ns1.aulasri.test.
+200 IN PTR ns2.aulasri.test.

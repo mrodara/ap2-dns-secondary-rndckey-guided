@@ -1,0 +1,132 @@
+services:
+  tsig-init:
+    # Usa la imagen BIND porque contiene tsig-keygen y el grupo bind.
+    build: { context: ./bind }
+    # Sustituye temporalmente el CMD de named por una inicialización explícita.
+    command:
+      - /bin/sh
+      - -ec
+      - |
+        # Corrige el directorio incluso si el volumen ya existía.
+        install -d -o root -g bind -m 0750 /run/tsig
+        # Genera la clave una sola vez; los arranques posteriores la conservan.
+        if [ ! -s /run/tsig/named.conf.key ]; then
+          umask 077
+          tsig-keygen -a hmac-sha256 dhcp-ddns. > /run/tsig/named.conf.key
+        fi
+        # Garantiza que named pueda leer la clave sin hacerla pública.
+        chown root:bind /run/tsig/named.conf.key
+        chmod 0440 /run/tsig/named.conf.key
+        printf 'Clave TSIG preparada sin mostrar el secreto.\n'
+    # Comparte la clave mediante un volumen, no mediante el proyecto.
+    volumes: [tsig-material:/run/tsig]
+    # Es un trabajo de una sola ejecución, no un demonio.
+    restart: "no"
+
+  primary:
+    # Reutiliza la misma imagen BIND.
+    build: { context: ./bind }
+    # Espera a que la clave exista antes de iniciar named.
+    depends_on: { tsig-init: { condition: service_completed_successfully } }
+    # Selecciona explícitamente la configuración del primario.
+    command: ["named", "-g", "-u", "bind", "-c", "/etc/bind/primary.conf"]
+    volumes:
+      # Persiste zonas dinámicas y journals.
+      - primary-zones:/var/lib/bind/dynamic
+      # Monta la clave en modo de solo lectura.
+      - tsig-material:/run/tsig:ro
+    # Fija la dirección usada por DHCP y el secundario.
+    networks: { lab: { ipv4_address: 10.53.0.100 } }
+    healthcheck:
+      # Solo está sano cuando responde el SOA de ambas zonas.
+      test: ["CMD-SHELL", "dig @127.0.0.1 aulasri.test SOA +short | grep -q . && dig @127.0.0.1 0.53.10.in-addr.arpa SOA +short | grep -q ."]
+      interval: 3s
+      timeout: 2s
+      retries: 20
+
+  secondary:
+    # Usa la misma imagen, pero otro archivo de configuración.
+    build: { context: ./bind }
+    # Espera a que el primario ya pueda responder consultas.
+    depends_on: { primary: { condition: service_healthy } }
+    # Selecciona la configuración secundaria.
+    command: ["named", "-g", "-u", "bind", "-c", "/etc/bind/secondary.conf"]
+    volumes:
+      # Persiste las zonas recibidas por transferencia.
+      - secondary-zones:/var/lib/bind/slave
+    # Fija la dirección autorizada en allow-transfer.
+    networks: { lab: { ipv4_address: 10.53.0.200 } }
+    healthcheck:
+      # Comprueba que las dos zonas ya se transfirieron y responden.
+      test: ["CMD-SHELL", "dig @127.0.0.1 aulasri.test SOA +short | grep -q . && dig @127.0.0.1 0.53.10.in-addr.arpa SOA +short | grep -q ."]
+      interval: 3s
+      timeout: 2s
+      retries: 20
+  
+  dhcpd:
+    # Construye la imagen explicada en los apartados 13 y 14.
+    build: { context: ./dhcp }
+    # Necesita la clave y un primario sano antes de aceptar concesiones.
+    depends_on:
+      tsig-init: { condition: service_completed_successfully }
+      primary: { condition: service_healthy }
+    # Permite las operaciones de red necesarias para DHCP.
+    cap_add: [NET_ADMIN, NET_RAW]
+    volumes:
+      # Conserva las concesiones entre reinicios.
+      - dhcp-leases:/var/lib/dhcp
+      # Comparte la clave en modo de solo lectura.
+      - tsig-material:/run/tsig:ro
+    # Mantiene el servidor fuera del pool de concesiones.
+    networks: { lab: { ipv4_address: 10.53.0.2 } }
+    healthcheck:
+      # Confirma que el proceso dhcpd continúa activo.
+      test: ["CMD-SHELL", "pgrep -x dhcpd >/dev/null"]
+      interval: 3s
+      timeout: 2s
+      retries: 20
+
+  client1:
+    # Construye la imagen de cliente didáctico.
+    build:
+      context: ./client
+      args:
+        # Graba cliente1 en dhclient.conf durante la construcción.
+        CLIENT_HOSTNAME: cliente1
+    # Permite eliminar la dirección temporal y solicitar otra por DHCP.
+    cap_add: [NET_ADMIN, NET_RAW]
+    # La dirección temporal está fuera del pool DHCP.
+    networks: { lab: { ipv4_address: 10.53.0.20 } }
+
+  client2:
+    # Reutiliza la misma imagen para observar una segunda concesión.
+    build:
+      context: ./client
+      args:
+        # Graba cliente2 en dhclient.conf durante la construcción.
+        CLIENT_HOSTNAME: cliente2
+    # Necesita las mismas capacidades de red.
+    cap_add: [NET_ADMIN, NET_RAW]
+    # También empieza fuera del pool DHCP.
+    networks: { lab: { ipv4_address: 10.53.0.21 } }
+
+networks:
+  lab:
+    # Crea una red bridge aislada dentro de Docker Desktop.
+    driver: bridge
+    ipam:
+      config:
+        # Define la subred, el rango automático de Docker y el gateway.
+        - subnet: 10.53.0.0/24
+          ip_range: 10.53.0.224/27
+          gateway: 10.53.0.1
+
+volumes:
+  # Clave privada compartida solo en tiempo de ejecución.
+  tsig-material:
+  # Zona editable y journals del primario.
+  primary-zones:
+  # Copias transferidas al secundario.
+  secondary-zones:
+  # Base persistente de concesiones DHCP.
+  dhcp-leases:
