@@ -1,0 +1,12 @@
+$TTL 60
+; El SOA identifica la zona y define temporizadores breves para el laboratorio.
+@ IN SOA ns1.aulasri.test. hostmaster.aulasri.test. ( 2026102801 60 30 604800 60 )
+; Los dos servidores son autoritativos para la zona.
+@ IN NS ns1.aulasri.test.
+@ IN NS ns2.aulasri.test.
+; Dirección fija del DNS primario.
+ns1 IN A 10.53.0.100
+; Dirección fija del DNS secundario.
+ns2 IN A 10.53.0.200
+; Dirección fija del servidor DHCP.
+dhcp IN A 10.53.0.2
